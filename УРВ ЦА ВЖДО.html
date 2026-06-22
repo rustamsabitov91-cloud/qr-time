@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>КОНТРОЛЬ ВРЕМЕНИ — ТОО "ВЖДО"</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: #0f172a;
+            margin: 0;
+            color: #ffffff;
+            overflow: hidden;
+        }
+        .container {
+            text-align: center;
+            background: #1e293b;
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            border: 1px solid #334155;
+        }
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+            color: #38bdf8;
+        }
+        .subtitle {
+            color: #94a3b8;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+        #qrcode {
+            background: white;
+            padding: 24px;
+            border-radius: 16px;
+            display: inline-block;
+        }
+        .timer-box {
+            margin-top: 25px;
+            font-size: 16px;
+            color: #94a3b8;
+            background: #0f172a;
+            padding: 10px 20px;
+            border-radius: 50px;
+            display: inline-block;
+        }
+        #seconds { color: #f43f5e; font-weight: 700; }
+        #clock { font-weight: 700; color: #f59e0b; }
+    </style>
+</head>
+<body>
+
+    <div id="screen-view" class="container">
+        <h1>СКАНИРУЙТЕ ДЛЯ ОТМЕТКИ</h1>
+        <div class="subtitle">Текущее время экрана: <span id="clock">00:00:00</span></div>
+        <div id="qrcode"></div>
+        <br>
+        <div class="timer-box">
+            Обновление QR-кода через: <span id="seconds">4</span> сек.
+        </div>
+    </div>
+
+    <div id="mobile-view" style="display:none; padding: 20px; text-align: center;">
+        <h2 style="color: #38bdf8;">Перенаправление...</h2>
+        <p>Загрузка системы учета времени ТОО "ВЖДО"</p>
+    </div>
+
+    <script>
+        // Идентификация: проверяем, открыт ли файл как экран проходной или со смартфона по QR
+        const urlParams = new URLSearchParams(window.location.search);
+        const scanToken = urlParams.get('scan');
+
+        if (scanToken) {
+            // КОД ДЛЯ СМАРТФОНА СОТРУДНИКА
+            document.getElementById('screen-view').style.display = 'none';
+            document.getElementById('mobile-view').style.display = 'block';
+
+            // Базовая ссылка на вашу форму Tally
+            const tallyFormUrl = "https://tally.so/r/obgvKb";
+
+            // Ловим данные, которые сотрудник вводил ранее (если они есть)
+            let savedPhone = localStorage.getItem('emp_phone') || '';
+            let savedFio = localStorage.getItem('emp_fio') || '';
+
+            // Если это самый первый вход и параметров нет в памяти, мы поймаем их, когда он заполнит форму
+            // Чтобы Tally передал нам данные обратно и мы их запомнили, перенаправляем на форму с предзаполнением
+            
+            // Технический ID ваших полей в Tally (Tally автоматически подставит их, если передать в ссылке)
+            // Формируем ссылку для Tally с автоматическим заполнением сохраненных данных и нового токена
+            let redirectUrl = tallyFormUrl + "?token=" + scanToken;
+            
+            if (savedPhone) {
+                // Подставляем телефон в поле (Tally связывает параметры по названию поля)
+                redirectUrl += "&Введите ваш номер телефона (Логин)=" + encodeURIComponent(savedPhone);
+            }
+            if (savedFio) {
+                // Подставляем ФИО в поле
+                redirectUrl += "&Введите ваши Фамилию, Имя, Отчество=" + encodeURIComponent(savedFio);
+            }
+
+            // Мгновенно перенаправляем сотрудника на форму, где всё уже заполнено!
+            window.location.href = redirectUrl;
+
+        } else {
+            // КОД ДЛЯ ЭКРАНА ПРОХОДНОЙ (Отображение QR)
+            const qrcodeDiv = document.getElementById("qrcode");
+            const clockSpan = document.getElementById("clock");
+            const secondsSpan = document.getElementById("seconds");
+            
+            let qrcode = new QRCode(qrcodeDiv, { 
+                width: 300, 
+                height: 300,
+                correctLevel : QRCode.CorrectLevel.H 
+            });
+            
+            let intervalSeconds = 4; 
+            let countdown = intervalSeconds;
+
+            function generateDynamicQR() {
+                let now = new Date();
+                let hours = String(now.getHours()).padStart(2, '0');
+                let minutes = String(now.getMinutes()).padStart(2, '0');
+                let seconds = String(now.getSeconds()).padStart(2, '0');
+                let timeToken = hours + minutes + seconds;
+                
+                // Теперь QR-код ведет на этот же самый файл, но передает ему параметр времени
+                let currentFileUrl = window.location.href.split('?')[0];
+                let finalUrl = currentFileUrl + "?scan=" + timeToken;
+                
+                qrcode.clear();
+                qrcode.makeCode(finalUrl);
+                
+                clockSpan.innerText = hours + ":" + minutes + ":" + seconds;
+            }
+
+            setInterval(() => {
+                countdown--;
+                secondsSpan.innerText = countdown;
+                if (countdown <= 0) {
+                    generateDynamicQR();
+                    countdown = intervalSeconds;
+                }
+            }, 1000);
+
+            generateDynamicQR();
+        }
+    </script>
+</body>
+</html>
